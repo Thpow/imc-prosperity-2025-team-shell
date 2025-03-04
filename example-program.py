@@ -3,7 +3,9 @@ from typing import List
 import string
 
 class Trader:
-    
+    def __init__(self):
+        self.current_position = 0
+
     def run(self, state: TradingState):
         # Only method required. It takes all buy and sell orders for all symbols as an input, and outputs a list of orders to be sent.
         print("traderData: " + state.traderData)
@@ -24,17 +26,33 @@ class Trader:
             
             if buy_order_count > sell_order_count:
                 # If the buy side has more orders, we try to sell (because the majority is buying)
-                if len(order_depth.sell_orders) > 0:
+                if self.current_position == 1:
+                    pass
+                elif self.current_position == 0:
                     best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-                    print(f"SELL {best_ask_amount}x at {best_ask}")
-                    orders.append(Order(product, best_ask, -best_ask_amount))
+                    orders.append(Order(product, best_ask, 1))
+                    self.current_position = self.current_position + 1
+                elif self.current_position == -1:
+                    best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+                    orders.append(Order(product, best_ask, 2))
+                    self.current_position = self.current_position + 2
+                else:
+                    print('something went pretty wrong')
+                    exit(1)
             else:
-                # If the sell side has more orders, we try to buy (because the majority is selling)
-                if len(order_depth.buy_orders) > 0:
+                if self.current_position == -1:
+                    pass
+                elif self.current_position == 0:
                     best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-                    print(f"BUY {best_bid_amount}x at {best_bid}")
-                    orders.append(Order(product, best_bid, -best_bid_amount))
-            
+                    orders.append(Order(product, best_bid, -1))
+                    self.current_position = self.current_position - 1
+                elif self.current_position == 1:
+                    best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+                    orders.append(Order(product, best_bid, -2))
+                    self.current_position = self.current_position - 2
+                else:
+                    print('something went pretty wrong')
+                    exit(1)
             result[product] = orders
         
         traderData = "SAMPLE"  # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
