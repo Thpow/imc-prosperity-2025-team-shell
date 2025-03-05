@@ -14,12 +14,12 @@ class Trader:
         self.max_history_length = 50  # Increased to accommodate longer indicator periods
         
         # Market making parameters
-        self.spread_multiplier = 0.8
+        self.spread_multiplier = 0.5
         self.min_spread = 1
         self.max_position_spread_adjustment = 0.5
         
         # Volume parameters
-        self.base_volume = 10
+        self.base_volume = 15
         self.volume_scaling = 1.0
         
         # Volatility tracking
@@ -32,22 +32,22 @@ class Trader:
         
         # Directional trading parameters
         self.momentum_threshold = 0.001
-        self.momentum_boost = 1.5  # Reduced from 2.0 for more conservative trading
+        self.momentum_boost = 1.0  # Reduced from 2.0 for more conservative trading
         
         # Arbitrage parameters
-        self.arbitrage_aggressiveness = 0.8  # Reduced from 0.9 for more conservative trading
+        self.arbitrage_aggressiveness = 0.7  # Reduced from 0.9 for more conservative trading
         
         # Price improvement parameters
         self.price_improve_threshold = 0.5  # Reduced from 0.6 for more conservative trading
         
         # RSI parameters
         self.rsi_period = 14  # Standard RSI period
-        self.rsi_oversold = 30
-        self.rsi_overbought = 70
+        self.rsi_oversold = 35  # Adjusted from 30 for better performance
+        self.rsi_overbought = 65  # Adjusted from 70 for better performance
         
         # Bollinger Bands parameters
         self.bb_period = 20  # Standard Bollinger Bands period
-        self.bb_std = 2.0
+        self.bb_std = 2.0  # Adjusted from 2.5 for better performance
     
     def calculate_mid_price(self, order_depth):
         """Calculate mid price from order book"""
