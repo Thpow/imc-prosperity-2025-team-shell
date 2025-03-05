@@ -7,11 +7,12 @@ class Trader:
     def __init__(self):
         # Initialize position tracking
         self.position = 0
-        self.position_limit = 48  # Standard position limit for KELP
+        self.positions = {}  # Dictionary to track positions per product
+        self.position_limit = 50  # Hard position limit requirement - not to be changed
         
         # Price history for products
         self.price_history = {}
-        self.max_history_length = 54  # Increased to accommodate longer indicator periods
+        self.max_history_length = 30  # Increased to accommodate longer indicator periods
         
         # Market making parameters
         self.spread_multiplier = 0.5
@@ -35,10 +36,10 @@ class Trader:
         self.momentum_boost = 1.0  # Reduced from 2.0 for more conservative trading
         
         # Arbitrage parameters
-        self.arbitrage_aggressiveness = 0.7  # Reduced from 0.9 for more conservative trading
+        self.arbitrage_aggressiveness = 0.78  # Reduced from 0.9 for more conservative trading
         
         # Price improvement parameters
-        self.price_improve_threshold = 0.4105830409144121  # Reduced from 0.6 for more conservative trading
+        self.price_improve_threshold = 0.6  # Reduced from 0.6 for more conservative trading
         
         # RSI parameters
         self.rsi_period = 14  # Standard RSI period
@@ -315,9 +316,11 @@ class Trader:
             # Place orders if volumes are positive
             if buy_volume > 0:
                 orders.append(Order(product, our_bid, buy_volume))
+                current_position += buy_volume
             
             if sell_volume > 0:
                 orders.append(Order(product, our_ask, -sell_volume))
+                current_position -= sell_volume
             
             # Take advantage of arbitrage opportunities - more conservative
             arb_opportunities = []
@@ -344,7 +347,8 @@ class Trader:
                     orders.append(Order(product, ask_price, trade_size))
                     orders.append(Order(product, bid_price, -trade_size))
                     
-                    # Update remaining capacity after this trade
+                    # Net position change is zero for arbitrage (buy and sell same amount)
+                    # but we still need to update the remaining capacity
                     remaining_buy_capacity -= trade_size
                     remaining_sell_capacity -= trade_size
             
@@ -362,16 +366,21 @@ class Trader:
                         aggressive_buy_size = int(min(remaining_buy_capacity * 0.4, total_asks * 0.2))
                         if aggressive_buy_size > 0:
                             orders.append(Order(product, best_ask, aggressive_buy_size))
+                            current_position += aggressive_buy_size
                     
                     elif imbalance < -0.4 and current_position > -self.position_limit * 0.7:  # Strong selling pressure
                         aggressive_sell_size = int(min(remaining_sell_capacity * 0.4, total_bids * 0.2))
                         if aggressive_sell_size > 0:
                             orders.append(Order(product, best_bid, -aggressive_sell_size))
+                            current_position -= aggressive_sell_size
             
             # Save market state for next iteration
             self.last_mid_price[product] = mid_price
             
+            # Update position
+            self.positions[product] = current_position
+            
             # Store result
             result[product] = orders
         
-        return result, self.trader_data, ""
+        return result, 0, ""

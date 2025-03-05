@@ -12,7 +12,6 @@ This script performs systematic parameter optimization using various methods:
 - **Grid Search**: Tests all combinations of selected parameters
 - **Bayesian Optimization**: Uses a simple Bayesian-inspired approach to balance exploration and exploitation
 - **Hill Climbing**: Iteratively improves parameters by testing neighboring values
-- **Coordinate Ascent**: Optimizes one parameter at a time, finding the local optimum for each parameter before moving to the next
 
 #### Usage:
 
@@ -28,12 +27,7 @@ python parameter_tuner.py --method random --iterations 30 --round 0 --apply-best
 
 # Run hill climbing with 15 iterations
 python parameter_tuner.py --method hill --iterations 15 --round 0
-
-# Run coordinate ascent with 5 iterations
-python parameter_tuner.py --method coordinate --iterations 5 --round 0
 ```
-
-The `--iterations` parameter specifies the maximum number of iterations per parameter for the coordinate ascent method.
 
 ### 2. Quick Test (`quick_test.py`)
 
@@ -76,8 +70,6 @@ python analyze_results.py
 
 5. **Final Optimization**: Use hill climbing to fine-tune the best parameter combination found.
 
-6. **Fine-tuning**: Use the coordinate ascent method to find local optima for each parameter.
-
 ## Example Tuning Session
 
 ```bash
@@ -96,10 +88,7 @@ python parameter_tuner.py --method grid --round 0
 # Step 5: Run hill climbing to fine-tune the best parameters
 python parameter_tuner.py --method hill --iterations 15 --round 0 --apply-best
 
-# Step 6: Fine-tune using coordinate ascent
-python parameter_tuner.py --method coordinate --iterations 5 --round 0 --apply
-
-# Step 7: Verify the final performance
+# Step 6: Verify the final performance
 python quick_test.py
 ```
 
@@ -118,5 +107,3 @@ python quick_test.py
 6. **Be patient** - parameter tuning is an iterative process that takes time.
 
 7. **Consider the trade-off between exploration and exploitation** - too much exploration may not converge to the best parameters, while too much exploitation may get stuck in local optima.
-
-8. **Use the `--apply` flag** to automatically apply the best parameters found.
