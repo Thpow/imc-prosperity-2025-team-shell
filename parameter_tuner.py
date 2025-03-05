@@ -314,6 +314,306 @@ class ParameterTuner:
                 
                 print(f"Iteration {i+1}/{iterations}: Profit = {neighbor_profit}")
     
+    def coordinate_ascent(self, iterations_per_param=5, step_size_percent=0.01, min_improvement=0.0001) -> None:
+        """
+        Perform coordinate ascent optimization - optimizing one parameter at a time.
+        
+        This method:
+        1. Takes each parameter one at a time
+        2. Tries small adjustments in both directions
+        3. Moves in the direction that improves profit
+        4. Continues until no further improvement is found
+        5. Moves to the next parameter
+        6. Repeats the entire process until no parameter can be improved further
+        
+        Args:
+            iterations_per_param: Maximum number of iterations per parameter
+            step_size_percent: Initial step size as a percentage of the parameter value
+            min_improvement: Minimum relative improvement required to continue
+        """
+        print("Starting Coordinate Ascent optimization...")
+        
+        # Start with current best parameters
+        if self.best_params is None:
+            self.best_params = self.get_current_params()
+        
+        # Define parameter types and bounds
+        param_types = {}
+        param_bounds = {}
+        
+        for param_name in self.param_ranges.keys():
+            # Determine parameter type (int or float)
+            if isinstance(self.best_params[param_name], int):
+                param_types[param_name] = int
+            else:
+                param_types[param_name] = float
+            
+            # Set bounds based on parameter ranges
+            param_bounds[param_name] = (min(self.param_ranges[param_name]), max(self.param_ranges[param_name]))
+        
+        # Initial evaluation with current parameters
+        self.update_params_in_file(self.best_params)
+        total_profit, _ = self.run_backtest()
+        self.best_profit = total_profit
+        
+        print(f"Initial profit: {total_profit} with parameters: {self.best_params}")
+        
+        # Track if any parameter was improved in the last full cycle
+        global_improvement = True
+        global_cycle = 0
+        
+        # Keep track of step sizes for each parameter
+        step_sizes = {}
+        for param_name in self.param_ranges.keys():
+            current_value = self.best_params[param_name]
+            if param_types[param_name] == int:
+                step_sizes[param_name] = max(1, int(current_value * step_size_percent))
+            else:
+                step_sizes[param_name] = max(0.001, current_value * step_size_percent)
+        
+        # Keep track of stagnant cycles for each parameter
+        stagnant_cycles = {param: 0 for param in self.param_ranges.keys()}
+        max_stagnant_cycles = 3  # After this many cycles without improvement, increase step size
+        
+        while global_improvement and global_cycle < 5:  # Limit to 5 full cycles
+            global_improvement = False
+            global_cycle += 1
+            print(f"\n=== Starting global cycle {global_cycle} ===")
+            
+            # Randomize parameter order to avoid getting stuck in local optima
+            param_names = list(self.param_ranges.keys())
+            import random
+            random.shuffle(param_names)
+            
+            # Optimize each parameter individually
+            for param_name in param_names:
+                print(f"\nOptimizing parameter: {param_name}")
+                
+                param_improved = True
+                param_cycle = 0
+                
+                # Adjust step size based on stagnation
+                if stagnant_cycles[param_name] >= max_stagnant_cycles:
+                    step_sizes[param_name] *= 2  # Double step size after stagnation
+                    print(f"  Increasing step size for {param_name} to {step_sizes[param_name]} after {stagnant_cycles[param_name]} stagnant cycles")
+                    stagnant_cycles[param_name] = 0
+                
+                # Continue optimizing this parameter until no improvement
+                while param_improved and param_cycle < iterations_per_param:
+                    param_improved = False
+                    param_cycle += 1
+                    
+                    current_value = self.best_params[param_name]
+                    param_type = param_types[param_name]
+                    lower_bound, upper_bound = param_bounds[param_name]
+                    step_size = step_sizes[param_name]
+                    
+                    # Try multiple step sizes in both directions
+                    test_values = []
+                    
+                    # Add increasing values
+                    for multiplier in [0.5, 1.0, 2.0]:
+                        test_step = step_size * multiplier
+                        if current_value + test_step <= upper_bound:
+                            test_values.append((current_value + test_step, f"increase (x{multiplier})"))
+                    
+                    # Add decreasing values
+                    for multiplier in [0.5, 1.0, 2.0]:
+                        test_step = step_size * multiplier
+                        if current_value - test_step >= lower_bound:
+                            test_values.append((current_value - test_step, f"decrease (x{multiplier})"))
+                    
+                    # Test all values
+                    best_test_profit = -float('inf')
+                    best_test_value = None
+                    best_test_direction = None
+                    
+                    for test_value, direction in test_values:
+                        test_params = self.best_params.copy()
+                        test_params[param_name] = param_type(test_value)
+                        
+                        self.update_params_in_file(test_params)
+                        test_profit, _ = self.run_backtest()
+                        
+                        # Record the test
+                        self.results_history.append({
+                            "iteration": len(self.results_history) + 1,
+                            "params": test_params.copy(),
+                            "total_profit": test_profit,
+                            "direction": direction,
+                            "param_name": param_name
+                        })
+                        
+                        print(f"  Testing {param_name} = {test_params[param_name]} ({direction}): Profit = {test_profit}")
+                        
+                        if test_profit > best_test_profit:
+                            best_test_profit = test_profit
+                            best_test_value = test_value
+                            best_test_direction = direction
+                    
+                    # If no test values were possible, skip this parameter
+                    if not test_values:
+                        print(f"  No valid test values for {param_name} within bounds [{lower_bound}, {upper_bound}]")
+                        break
+                    
+                    # Check if there's an improvement
+                    if best_test_profit > self.best_profit * (1 + min_improvement):
+                        # Update best parameters
+                        self.best_params[param_name] = param_type(best_test_value)
+                        self.best_profit = best_test_profit
+                        param_improved = True
+                        global_improvement = True
+                        stagnant_cycles[param_name] = 0  # Reset stagnant cycles
+                        
+                        print(f"  Iteration {param_cycle}: {best_test_direction} {param_name} to {self.best_params[param_name]}, new profit: {best_test_profit}")
+                        
+                        # If we found a significant improvement, try an even larger step in that direction
+                        if best_test_profit > self.best_profit * 1.01:  # 1% improvement
+                            print(f"  Significant improvement found! Adjusting step size for {param_name}")
+                            if "increase" in best_test_direction:
+                                step_sizes[param_name] *= 1.5  # Increase step size
+                            elif "decrease" in best_test_direction:
+                                step_sizes[param_name] *= 1.5  # Increase step size
+                    else:
+                        print(f"  Iteration {param_cycle}: No improvement for {param_name}")
+                        stagnant_cycles[param_name] += 1
+                        
+                        # If we're not finding improvements, try reducing the step size
+                        if param_cycle >= 2 and not param_improved:
+                            step_sizes[param_name] *= 0.5  # Halve step size
+                            step_sizes[param_name] = max(0.001 if param_type == float else 1, step_sizes[param_name])
+                            print(f"  Reducing step size for {param_name} to {step_sizes[param_name]}")
+                
+                # Save results after each parameter optimization
+                self.save_results()
+                
+                # Apply best parameters found so far
+                self.update_params_in_file(self.best_params)
+                
+                # Try random perturbation if we're stuck
+                if global_cycle > 1 and not global_improvement:
+                    print("\nTrying random perturbation to escape local optimum...")
+                    perturbed_params = self.best_params.copy()
+                    
+                    # Perturb up to 3 parameters randomly
+                    perturb_count = min(3, len(param_names))
+                    params_to_perturb = random.sample(param_names, perturb_count)
+                    
+                    for p_name in params_to_perturb:
+                        p_type = param_types[p_name]
+                        lower, upper = param_bounds[p_name]
+                        current = perturbed_params[p_name]
+                        
+                        # Random perturbation between 5-15% of the parameter value
+                        perturb_percent = random.uniform(0.05, 0.15)
+                        perturb_amount = max(0.001 if p_type == float else 1, current * perturb_percent)
+                        
+                        # Randomly decide direction
+                        if random.choice([True, False]) and current + perturb_amount <= upper:
+                            perturbed_params[p_name] = p_type(current + perturb_amount)
+                        elif current - perturb_amount >= lower:
+                            perturbed_params[p_name] = p_type(current - perturb_amount)
+                    
+                    # Test the perturbed parameters
+                    self.update_params_in_file(perturbed_params)
+                    perturb_profit, _ = self.run_backtest()
+                    
+                    print(f"Random perturbation profit: {perturb_profit}")
+                    
+                    # Record the test
+                    self.results_history.append({
+                        "iteration": len(self.results_history) + 1,
+                        "params": perturbed_params.copy(),
+                        "total_profit": perturb_profit,
+                        "direction": "random_perturbation",
+                        "param_name": "multiple"
+                    })
+                    
+                    # If perturbation improved profit, accept it
+                    if perturb_profit > self.best_profit:
+                        self.best_params = perturbed_params
+                        self.best_profit = perturb_profit
+                        global_improvement = True
+                        print(f"Random perturbation improved profit to {perturb_profit}!")
+                    else:
+                        # Revert to best parameters
+                        self.update_params_in_file(self.best_params)
+            
+            if not global_improvement:
+                print("\nNo improvement found in this global cycle.")
+                
+                # Try more aggressive random search as a last resort
+                if global_cycle == 3:  # On the third cycle with no improvement
+                    print("\nTrying more aggressive random search...")
+                    
+                    best_random_profit = self.best_profit
+                    best_random_params = self.best_params.copy()
+                    
+                    # Try 10 random parameter sets
+                    for i in range(10):
+                        random_params = self.best_params.copy()
+                        
+                        # Randomly adjust all parameters
+                        for p_name in param_names:
+                            p_type = param_types[p_name]
+                            lower, upper = param_bounds[p_name]
+                            
+                            # Random value within 20% of current
+                            current = random_params[p_name]
+                            max_adjust = current * 0.2
+                            
+                            # Ensure minimum adjustment
+                            if p_type == float:
+                                max_adjust = max(0.001, max_adjust)
+                            else:
+                                max_adjust = max(1, int(max_adjust))
+                            
+                            # Random adjustment
+                            adjustment = random.uniform(-max_adjust, max_adjust)
+                            new_value = current + adjustment
+                            
+                            # Ensure within bounds
+                            new_value = max(lower, min(upper, new_value))
+                            random_params[p_name] = p_type(new_value)
+                        
+                        # Test random parameters
+                        self.update_params_in_file(random_params)
+                        random_profit, _ = self.run_backtest()
+                        
+                        print(f"Random search {i+1}/10: Profit = {random_profit}")
+                        
+                        # Record the test
+                        self.results_history.append({
+                            "iteration": len(self.results_history) + 1,
+                            "params": random_params.copy(),
+                            "total_profit": random_profit,
+                            "direction": "random_search",
+                            "param_name": "all"
+                        })
+                        
+                        if random_profit > best_random_profit:
+                            best_random_profit = random_profit
+                            best_random_params = random_params.copy()
+                            print(f"Found better random parameters! Profit: {random_profit}")
+                    
+                    # If random search improved profit, accept it
+                    if best_random_profit > self.best_profit:
+                        self.best_params = best_random_params
+                        self.best_profit = best_random_profit
+                        global_improvement = True
+                        print(f"Random search improved profit to {best_random_profit}!")
+                    else:
+                        # Revert to best parameters
+                        self.update_params_in_file(self.best_params)
+            
+        print(f"\nCoordinate Ascent completed. Best profit: {self.best_profit}")
+        print("Best parameters:")
+        for param, value in self.best_params.items():
+            print(f"  {param}: {value}")
+        
+        # Apply the best parameters
+        self.update_params_in_file(self.best_params)
+    
     def _generate_combinations(self, param_values):
         """Generate all combinations of parameter values"""
         if not param_values:
@@ -356,30 +656,29 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Parameter tuner for trading strategy")
-    parser.add_argument("--method", type=str, default="bayesian", 
-                        choices=["random", "grid", "bayesian", "hill"],
-                        help="Optimization method to use")
-    parser.add_argument("--iterations", type=int, default=20,
-                        help="Number of iterations for optimization")
-    parser.add_argument("--round", type=int, default=0,
-                        help="Round number for backtesting")
-    parser.add_argument("--apply-best", action="store_true",
-                        help="Apply best parameters after optimization")
+    parser.add_argument("--method", type=str, choices=["random", "grid", "bayesian", "hill", "coordinate"], 
+                        default="random", help="Optimization method to use")
+    parser.add_argument("--iterations", type=int, default=20, 
+                        help="Number of iterations for random search, Bayesian optimization, or hill climbing")
+    parser.add_argument("--round", type=int, default=0, 
+                        help="Round number to test on")
+    parser.add_argument("--apply", action="store_true", 
+                        help="Apply the best parameters found to main.py")
     
     args = parser.parse_args()
     
     tuner = ParameterTuner(round_number=args.round)
     
-    # Run the selected optimization method
     if args.method == "random":
         tuner.random_search(iterations=args.iterations)
     elif args.method == "grid":
-        tuner.grid_search()
+        tuner.grid_search(param_names=["position_limit", "spread_multiplier", "base_volume", "momentum_boost"])
     elif args.method == "bayesian":
         tuner.bayesian_optimization(iterations=args.iterations)
     elif args.method == "hill":
         tuner.hill_climbing(iterations=args.iterations)
+    elif args.method == "coordinate":
+        tuner.coordinate_ascent(iterations_per_param=args.iterations)
     
-    # Apply best parameters if requested
-    if args.apply_best:
+    if args.apply:
         tuner.apply_best_params()

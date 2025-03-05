@@ -7,11 +7,11 @@ class Trader:
     def __init__(self):
         # Initialize position tracking
         self.position = 0
-        self.position_limit = 50  # Standard position limit for KELP
+        self.position_limit = 48  # Standard position limit for KELP
         
         # Price history for products
         self.price_history = {}
-        self.max_history_length = 50  # Increased to accommodate longer indicator periods
+        self.max_history_length = 54  # Increased to accommodate longer indicator periods
         
         # Market making parameters
         self.spread_multiplier = 0.5
@@ -20,7 +20,7 @@ class Trader:
         
         # Volume parameters
         self.base_volume = 15
-        self.volume_scaling = 1.0
+        self.volume_scaling = 0.8748203664009365
         
         # Volatility tracking
         self.volatility_window = 8
@@ -38,7 +38,7 @@ class Trader:
         self.arbitrage_aggressiveness = 0.7  # Reduced from 0.9 for more conservative trading
         
         # Price improvement parameters
-        self.price_improve_threshold = 0.5  # Reduced from 0.6 for more conservative trading
+        self.price_improve_threshold = 0.4105830409144121  # Reduced from 0.6 for more conservative trading
         
         # RSI parameters
         self.rsi_period = 14  # Standard RSI period

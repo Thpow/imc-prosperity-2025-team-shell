@@ -65,7 +65,12 @@ def analyze_parameter_impact(results):
         plt.plot(sorted(df[param].unique()), p(sorted(df[param].unique())), "r--")
     
     plt.tight_layout()
-    plt.savefig("parameter_impact.png")
+    
+    # Create visualizations directory if it doesn't exist
+    if not os.path.exists("visualizations"):
+        os.makedirs("visualizations")
+    
+    plt.savefig("visualizations/parameter_impact.png")
     plt.close()
     
     return correlations
@@ -99,7 +104,12 @@ def plot_profit_progression(results):
     plt.title("Profit Progression Over Iterations")
     plt.legend()
     plt.grid(True)
-    plt.savefig("profit_progression.png")
+    
+    # Create visualizations directory if it doesn't exist
+    if not os.path.exists("visualizations"):
+        os.makedirs("visualizations")
+    
+    plt.savefig("visualizations/profit_progression.png")
     plt.close()
 
 def find_best_parameters(results):
@@ -168,12 +178,17 @@ def analyze_parameter_distributions(results):
             plt.title(param)
     
     plt.tight_layout()
-    plt.savefig("parameter_distributions.png")
+    
+    # Create visualizations directory if it doesn't exist
+    if not os.path.exists("visualizations"):
+        os.makedirs("visualizations")
+    
+    plt.savefig("visualizations/parameter_distributions.png")
     plt.close()
 
 def main():
     # Create directories if they don't exist
-    for directory in ["tuning_results", "test_results"]:
+    for directory in ["tuning_results", "test_results", "backtests", "visualizations"]:
         if not os.path.exists(directory):
             os.makedirs(directory)
     
