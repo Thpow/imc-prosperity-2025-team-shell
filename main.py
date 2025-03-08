@@ -17,8 +17,8 @@ class Trader:
         self.position_limit = 50
 
         #=======history tacking=======#
-        self.price_history = {"RAINFOREST_RESIN":[]}
-        self.volatility_history = {"RAINFOREST_RESIN":[]}
+        self.price_history = {"RAINFOREST_RESIN":[], "KELP":[]}
+        self.volatility_history = {"RAINFOREST_RESIN":[], "KELP":[]}
         self.low = {}
         self.high = {}
 
@@ -115,6 +115,7 @@ class Trader:
         # Init
         result = {}
         orders: List[Order] = []
+        orders_kelp: List[Order] = []     
 
         # Get order depth for the product
         order_depth: OrderDepth = state.order_depths[product]
@@ -153,11 +154,14 @@ class Trader:
             if rsi < self.rsi_long_indicator and self.position < self.position_limit:
                 # Additional buy signal based on RSI oversold
                 orders.append(Order(product, current_price, self.position_limit - self.position))
+                orders_kelp.append(Order("KELP", self.calculate_mid_price(state.order_depths["KELP"]), -15))
             elif rsi > self.rsi_short_indicator and self.position > 0:
                 # Additional sell signal based on RSI overbought
                 orders.append(Order(product, current_price, -self.position))
+                orders_kelp.append(Order("KELP", self.calculate_mid_price(state.order_depths["KELP"]), 15))
 
         # Add all the orders to the result
         result[product] = orders
+        result["KELP"] = orders_kelp
         
         return result, 0, ""
