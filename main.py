@@ -7,7 +7,7 @@ from scipy.stats import norm
 
 from funcs import *
 
-product = "KELP"
+product = "RAINFOREST_RESIN"
 
 class Trader:
     def __init__(self):
@@ -17,8 +17,8 @@ class Trader:
         self.position_limit = 50
 
         #=======history tacking=======#
-        self.price_history = {"KELP":[]}
-        self.volatility_history = {"KELP":[]}
+        self.price_history = {"RAINFOREST_RESIN":[]}
+        self.volatility_history = {"RAINFOREST_RESIN":[]}
         self.low = {}
         self.high = {}
 
@@ -30,12 +30,12 @@ class Trader:
         self.long_ma_window = 200
         self.momentum_window = 10
         self.rsi_period = 14
-        self.bollinger_band_period = 20
+        self.bollinger_band_period = 10
 
         #thresholds
-        self.momentum_threshold = 0.1
-        self.rsi_long_indicator = 30
-        self.rsi_short_indicator = 50
+        self.momentum_threshold = 0.00
+        self.rsi_long_indicator = 50
+        self.rsi_short_indicator = 75
 
         
     def calculate_mid_price(self, order_depth):
@@ -95,68 +95,68 @@ class Trader:
 
     def calculate_bollinger_bands(self, prices, period, num_std=2):
         """Calculate Bollinger Bands"""
-        # Check if we have enough data
-        if len(prices[product]) < period:
-            mid_price = prices[product][-1] if prices[product] else 0
+        # Ensure the product exists in prices and we have enough data
+        if product not in prices or len(prices[product]) < period:
+            mid_price = prices[product][-1] if product in prices and prices[product] else 0
             return mid_price * 0.95, mid_price, mid_price * 1.05  # Return placeholder bands when not enough data
-        
-        # Calculate SMA
+
+        # Calculate SMA using the most recent 'period' prices
         price_data = prices[product][-period:]
         sma = sum(price_data) / period
-        
-        # Calculate standard deviation
+
+        # Calculate standard deviation and the bands
         std = statistics.stdev(price_data)
-        
-        # Calculate upper and lower bands
         upper_band = sma + (std * num_std)
         lower_band = sma - (std * num_std)
-        
+
         return lower_band, sma, upper_band
-        
+
     def run(self, state: TradingState):
         # Init
         result = {}
         orders: List[Order] = []
-        
+
         # Get order depth for the product
         order_depth: OrderDepth = state.order_depths[product]
-        
+
         # Update position
-        if product in state.position:
-            self.position = state.position[product]
-        else:
-            self.position = 0
-            
+        self.position = state.position.get(product, 0)
+
         # Get current mid price and update history
         current_price = self.calculate_mid_price(order_depth)
         if current_price is not None:
             self.price_history[product].append(current_price)
-            
+
         # Limit history length
         if len(self.price_history[product]) > self.max_history_length:
             self.price_history[product] = self.price_history[product][-self.max_history_length:]
-        
-        # We need at least rsi_period+1 data points to calculate indicators properly
+
+        # We need at least enough data for our indicators
         min_data_required = max(self.rsi_period + 1, self.bollinger_band_period, self.momentum_window + 1)
-        
+
         # Check if we have enough data to calculate indicators
         if len(self.price_history[product]) >= min_data_required:
             # Calculate indicators
             rsi = self.calculate_rsi(self.price_history, self.rsi_period)
             lower_band, sma, upper_band = self.calculate_bollinger_bands(self.price_history, self.bollinger_band_period)
             momentum = self.calculate_momentum(order_depth, self.price_history, self.momentum_window)
-            
-            # Trading logic - RSI based
-            if rsi < self.rsi_long_indicator and self.position < self.position_limit:
-                # Buy signal - RSI oversold
+
+            # Example: Bollinger Bands based trading logic
+            if current_price < lower_band and self.position < self.position_limit:
+                # Buy signal: price is below the lower Bollinger Band (oversold condition)
                 orders.append(Order(product, current_price, self.position_limit - self.position))
-                
-            elif rsi > self.rsi_short_indicator and self.position > 0:
-                # Sell signal - RSI overbought
+            elif current_price > upper_band and self.position > 0:
+                # Sell signal: price is above the upper Bollinger Band (overbought condition)
                 orders.append(Order(product, current_price, -self.position))
-                
-            # Add bollinger band logic here if needed
-                
+
+            # Existing RSI based signals can also be applied
+            if rsi < self.rsi_long_indicator and self.position < self.position_limit:
+                # Additional buy signal based on RSI oversold
+                orders.append(Order(product, current_price, self.position_limit - self.position))
+            elif rsi > self.rsi_short_indicator and self.position > 0:
+                # Additional sell signal based on RSI overbought
+                orders.append(Order(product, current_price, -self.position))
+
         # Add all the orders to the result
         result[product] = orders
         
