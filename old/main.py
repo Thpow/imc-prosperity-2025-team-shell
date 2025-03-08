@@ -12,7 +12,7 @@ def black_scholes(S, K, T, r, sigma, option_type='call'):
     if option_type == 'call':
         return S*norm.cdf(d1) - K*np.exp(-r*T)*norm.cdf(d2)
     else:  # put
-        return K*np.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)bomboclat
+        return K*np.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
 
 class Trader:
     def __init__(self):
