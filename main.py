@@ -7,37 +7,64 @@ from scipy.stats import norm
 
 from funcs import *
 
-product = "RAINFOREST_RESIN"
-
 class Trader:
     def __init__(self):
         # Initialize position tracking
         self.position = 0
         self.positions = {}
-        self.position_limit = 50
+        
+        # Position limits for each product
+        self.position_limits = {
+            "RAINFOREST_RESIN": 50,
+            "KELP": 50
+        }
 
-        #=======history tacking=======#
+        #=======history tracking=======#
         self.price_history = {"RAINFOREST_RESIN":[], "KELP":[]}
         self.volatility_history = {"RAINFOREST_RESIN":[], "KELP":[]}
         self.low = {}
         self.high = {}
 
-        #=======params=======#
-        #periods
+        #=======global params=======#
         self.max_history_length = 200
-        self.max_volatility_length = 200   
-        self.short_ma_window = 50
-        self.long_ma_window = 200
-        self.momentum_window = 10
-        self.rsi_period = 14
-        self.bollinger_band_period = 10
-
-        #thresholds
-        self.momentum_threshold = 0.00
-        self.rsi_long_indicator = 50
-        self.rsi_short_indicator = 75
-
+        self.max_volatility_length = 200
         
+        #=======RAINFOREST_RESIN params=======#
+        self.resin_params = {
+            # Periods
+            "short_ma_window": 50,
+            "long_ma_window": 200,
+            "momentum_window": 10,
+            "rsi_period": 14,
+            "bollinger_band_period": 10,
+            
+            # Thresholds
+            "momentum_threshold": 0.00,
+            "rsi_long_indicator": 50,  # Oversold threshold
+            "rsi_short_indicator": 75,  # Overbought threshold
+            
+            # Counter-trading parameters
+            "counter_trade_size": 10,  # Amount to trade in opposite direction for KELP
+        }
+        
+        #=======KELP params=======#
+        self.kelp_params = {
+            # Periods
+            "short_ma_window": 50,
+            "long_ma_window": 200,
+            "momentum_window": 10,
+            "rsi_period": 14,
+            "bollinger_band_period": 10,
+            
+            # Thresholds
+            "momentum_threshold": 0.00,
+            "rsi_long_indicator": 50,  # Oversold threshold  
+            "rsi_short_indicator": 70,  # Overbought threshold
+            
+            # Counter-trading parameters
+            "counter_trade_size": 0,  # Amount to trade in opposite direction for RESIN
+        }
+
     def calculate_mid_price(self, order_depth):
         """Calculate mid price from order book"""
         if not order_depth.buy_orders or not order_depth.sell_orders:
@@ -56,7 +83,7 @@ class Trader:
         best_ask = min(order_depth.sell_orders.keys())
         return (best_ask - best_bid)
 
-    def calculate_momentum(self, order_depth, price_history, momentum_window):
+    def calculate_momentum(self, order_depth, price_history, product, momentum_window):
         """Calculate momentum only if we have enough price history"""
         todays_price = self.calculate_mid_price(order_depth)
         
@@ -66,7 +93,7 @@ class Trader:
         else:
             return 0  # Return neutral momentum when not enough data
     
-    def calculate_rsi(self, prices, period):
+    def calculate_rsi(self, prices, product, period):
         """Calculate Relative Strength Index"""
         # Check if we have enough data
         if len(prices[product]) <= period:
@@ -93,7 +120,7 @@ class Trader:
         
         return rsi
 
-    def calculate_bollinger_bands(self, prices, period, num_std=2):
+    def calculate_bollinger_bands(self, prices, product, period, num_std=2):
         """Calculate Bollinger Bands"""
         # Ensure the product exists in prices and we have enough data
         if product not in prices or len(prices[product]) < period:
@@ -111,57 +138,121 @@ class Trader:
 
         return lower_band, sma, upper_band
 
-    def run(self, state: TradingState):
-        # Init
-        result = {}
-        orders: List[Order] = []
-        orders_kelp: List[Order] = []     
-
+    def process_product(self, product, state, params):
+        """Process trading logic for a specific product"""
+        orders = []
+        counter_orders = []
+        counter_product = "KELP" if product == "RAINFOREST_RESIN" else "RAINFOREST_RESIN"
+        
         # Get order depth for the product
-        order_depth: OrderDepth = state.order_depths[product]
-
+        order_depth = state.order_depths.get(product, None)
+        counter_order_depth = state.order_depths.get(counter_product, None)
+        
+        if not order_depth or not counter_order_depth:
+            return orders, counter_orders
+            
         # Update position
-        self.position = state.position.get(product, 0)
-
+        position = state.position.get(product, 0)
+        position_limit = self.position_limits[product]
+        
         # Get current mid price and update history
         current_price = self.calculate_mid_price(order_depth)
-        if current_price is not None:
-            self.price_history[product].append(current_price)
-
+        counter_price = self.calculate_mid_price(counter_order_depth)
+        
+        if current_price is None or counter_price is None:
+            return orders, counter_orders
+            
+        self.price_history[product].append(current_price)
+        
         # Limit history length
         if len(self.price_history[product]) > self.max_history_length:
             self.price_history[product] = self.price_history[product][-self.max_history_length:]
-
+            
         # We need at least enough data for our indicators
-        min_data_required = max(self.rsi_period + 1, self.bollinger_band_period, self.momentum_window + 1)
-
+        min_data_required = max(
+            params["rsi_period"] + 1, 
+            params["bollinger_band_period"], 
+            params["momentum_window"] + 1
+        )
+        
         # Check if we have enough data to calculate indicators
         if len(self.price_history[product]) >= min_data_required:
             # Calculate indicators
-            rsi = self.calculate_rsi(self.price_history, self.rsi_period)
-            lower_band, sma, upper_band = self.calculate_bollinger_bands(self.price_history, self.bollinger_band_period)
-            momentum = self.calculate_momentum(order_depth, self.price_history, self.momentum_window)
-
-            # Example: Bollinger Bands based trading logic
-            if current_price < lower_band and self.position < self.position_limit:
+            rsi = self.calculate_rsi(self.price_history, product, params["rsi_period"])
+            lower_band, sma, upper_band = self.calculate_bollinger_bands(
+                self.price_history, product, params["bollinger_band_period"]
+            )
+            momentum = self.calculate_momentum(
+                order_depth, self.price_history, product, params["momentum_window"]
+            )
+            
+            trade_size = 0
+            counter_trade_size = 0
+            
+            # Bollinger Bands based trading logic
+            if current_price < lower_band and position < position_limit:
                 # Buy signal: price is below the lower Bollinger Band (oversold condition)
-                orders.append(Order(product, current_price, self.position_limit - self.position))
-            elif current_price > upper_band and self.position > 0:
+                buy_size = min(2, position_limit - position)
+                if buy_size > 0:
+                    orders.append(Order(product, current_price, buy_size))
+                    # Counter-trade in opposite direction with smaller size
+                    counter_trade_size -= 1
+            elif current_price > upper_band and position > -position_limit:
                 # Sell signal: price is above the upper Bollinger Band (overbought condition)
-                orders.append(Order(product, current_price, -self.position))
+                sell_size = min(2, position_limit + position)
+                if sell_size > 0:
+                    orders.append(Order(product, current_price, -sell_size))
+                    # Counter-trade in opposite direction with smaller size
+                    counter_trade_size += 1
+                    
+            # RSI based signals
+            if rsi < params["rsi_long_indicator"] and position < position_limit:
+                # Buy signal based on RSI oversold
+                buy_size = min(5, position_limit - position)
+                if buy_size > 0:
+                    orders.append(Order(product, current_price, buy_size))
+                    # Counter-trade in opposite direction
+                    counter_trade_size -= params["counter_trade_size"]
+            elif rsi > params["rsi_short_indicator"] and position > -position_limit:
+                # Sell signal based on RSI overbought
+                sell_size = min(5, position_limit + position)
+                if sell_size > 0:
+                    orders.append(Order(product, current_price, -sell_size))
+                    # Counter-trade in opposite direction
+                    counter_trade_size += params["counter_trade_size"]
+            
+            # Process counter orders only if we have a valid counter price and trade size
+            if counter_trade_size != 0 and counter_price is not None:
+                counter_position = state.position.get(counter_product, 0)
+                counter_limit = self.position_limits[counter_product]
+                
+                # Ensure we don't exceed position limits for counter trades
+                if counter_trade_size > 0:
+                    counter_trade_size = min(counter_trade_size, counter_limit - counter_position)
+                else:
+                    counter_trade_size = max(counter_trade_size, -counter_limit - counter_position)
+                
+                if counter_trade_size != 0:
+                    counter_orders.append(Order(counter_product, counter_price, counter_trade_size))
+        
+        return orders, counter_orders
 
-            # Existing RSI based signals can also be applied
-            if rsi < self.rsi_long_indicator and self.position < self.position_limit:
-                # Additional buy signal based on RSI oversold
-                orders.append(Order(product, current_price, self.position_limit - self.position))
-                orders_kelp.append(Order("KELP", self.calculate_mid_price(state.order_depths["KELP"]), -15))
-            elif rsi > self.rsi_short_indicator and self.position > 0:
-                # Additional sell signal based on RSI overbought
-                orders.append(Order(product, current_price, -self.position))
-                orders_kelp.append(Order("KELP", self.calculate_mid_price(state.order_depths["KELP"]), 15))
-
-        # Add all the orders to the result
-        result[product] = orders
-        result["KELP"] = orders_kelp
+    def run(self, state: TradingState):
+        # Init
+        result = {}
+        
+        # Initialize empty orders for each product
+        result["RAINFOREST_RESIN"] = []
+        result["KELP"] = []
+        
+        # Process RAINFOREST_RESIN
+        resin_orders, resin_counter_orders = self.process_product("RAINFOREST_RESIN", state, self.resin_params)
+        result["RAINFOREST_RESIN"].extend(resin_orders)
+        result["KELP"].extend(resin_counter_orders)
+        
+        # Process KELP
+        kelp_orders, kelp_counter_orders = self.process_product("KELP", state, self.kelp_params)
+        result["KELP"].extend(kelp_orders)
+        result["RAINFOREST_RESIN"].extend(kelp_counter_orders)
         
         return result, 0, ""
