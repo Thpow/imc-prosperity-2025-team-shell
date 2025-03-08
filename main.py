@@ -32,37 +32,37 @@ class Trader:
         #=======RAINFOREST_RESIN params=======#
         self.resin_params = {
             # Periods
-            "short_ma_window": 50,
-            "long_ma_window": 200,
-            "momentum_window": 10,
-            "rsi_period": 14,
-            "bollinger_band_period": 10,
+            "short_ma_window": 22,
+            "long_ma_window": 153,
+            "momentum_window": 14,
+            "rsi_period": 13,
+            "bollinger_band_period": 16,
             
             # Thresholds
-            "momentum_threshold": 0.00,
-            "rsi_long_indicator": 50,  # Oversold threshold
-            "rsi_short_indicator": 75,  # Overbought threshold
+            "momentum_threshold": 0.19,
+            "rsi_long_indicator": 40,  # Oversold threshold
+            "rsi_short_indicator": 76,  # Overbought threshold
             
             # Counter-trading parameters
-            "counter_trade_size": 10,  # Amount to trade in opposite direction for KELP
+            "counter_trade_size": 9,  # Amount to trade in opposite direction for KELP
         }
         
         #=======KELP params=======#
         self.kelp_params = {
             # Periods
-            "short_ma_window": 50,
-            "long_ma_window": 200,
-            "momentum_window": 10,
-            "rsi_period": 14,
-            "bollinger_band_period": 10,
+            "short_ma_window": 43,
+            "long_ma_window": 103,
+            "momentum_window": 17,
+            "rsi_period": 17,
+            "bollinger_band_period": 21,
             
             # Thresholds
-            "momentum_threshold": 0.00,
-            "rsi_long_indicator": 50,  # Oversold threshold  
-            "rsi_short_indicator": 70,  # Overbought threshold
+            "momentum_threshold": 0.03,
+            "rsi_long_indicator": 41,  # Oversold threshold  
+            "rsi_short_indicator": 77,  # Overbought threshold
             
             # Counter-trading parameters
-            "counter_trade_size": 0,  # Amount to trade in opposite direction for RESIN
+            "counter_trade_size": 9,  # Amount to trade in opposite direction for RESIN
         }
 
     def calculate_mid_price(self, order_depth):
