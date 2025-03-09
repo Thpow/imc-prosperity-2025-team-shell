@@ -5,7 +5,7 @@ import numpy as np
 class Trader:
     def __init__(self):
         # Position limits per product
-        self.POSITION_LIMITS = {"KELP": 50, "RAINFOREST_RESIN": 50}
+        self.POSITION_LIMITS = {"KELP": 45, "RAINFOREST_RESIN": 50}
         # Historical price tracking
         self.historical_prices = {"KELP": [], "RAINFOREST_RESIN": []}
         # Strategy parameters
