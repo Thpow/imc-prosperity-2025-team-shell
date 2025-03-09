@@ -13,11 +13,11 @@ class Trader:
             "KELP": {
                 "window": 51, 
                 "std_multiplier": .91,
-                "rsi_period": 50,      # Standard RSI period
-                "rsi_overbought": 70,  # RSI threshold for overbought
-                "rsi_oversold": 30,    # RSI threshold for oversold
-                "rsi_neutral_high": 60, # Upper neutral zone - avoid buying
-                "rsi_neutral_low": 40   # Lower neutral zone - avoid selling
+                "rsi_period": 24,      # Modified by parallel optimizer
+                "rsi_overbought": 71,      # Modified by parallel optimizer
+                "rsi_oversold": 25,      # Modified by parallel optimizer
+                "rsi_neutral_high": 62,      # Modified by parallel optimizer
+                "rsi_neutral_low": 40,      # Modified by parallel optimizer
             },  
             "RAINFOREST_RESIN": {"acceptable_price": 10000}  # Existing threshold
         }
