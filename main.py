@@ -11,10 +11,10 @@ class Trader:
         # Strategy parameters
         self.params = {
             "KELP": {
-                "acceptable_price": 2000  # New simplified threshold strategy like RESIN
+                "acceptable_price": 2000  # Simplified threshold strategy
             },  
             "RAINFOREST_RESIN": {"acceptable_price": 10000},  # Existing threshold
-            "SQUID_INK": {"acceptable_price": 2000}  # New product with same strategy as KELP
+            "SQUID_INK": {"acceptable_price": 2000}  # Placeholder - not actually used for trading
         }
         # Track market conditions for KELP
         self.market_conditions = {"KELP": "normal", "SQUID_INK": "normal"}  # Can be "normal", "overbought", "oversold"
@@ -92,8 +92,13 @@ class Trader:
                 if len(self.historical_prices[product]) > 100:
                     self.historical_prices[product].pop(0)
 
-            # Simple threshold strategy for both KELP and RAINFOREST_RESIN
-            if product == "KELP" or product == "SQUID_INK":
+            # SQUID_INK placeholder strategy - no trading
+            if product == "SQUID_INK":
+                # Just track prices but don't trade
+                result[product] = []  # Empty orders list means no trades
+                
+            # KELP threshold strategy
+            elif product == "KELP":
                 acceptable_price = self.params[product]["acceptable_price"]
                 if order_depth.sell_orders:
                     best_ask = min(order_depth.sell_orders.keys())
@@ -108,8 +113,10 @@ class Trader:
                         if sell_quantity > 0:
                             orders.append(Order(product, best_bid, -sell_quantity))
 
+                result[product] = orders
+
+            # RAINFOREST_RESIN threshold strategy
             elif product == "RAINFOREST_RESIN":
-                # Existing strategy (optimized slightly)
                 acceptable_price = self.params[product]["acceptable_price"]
                 if order_depth.sell_orders:
                     best_ask = min(order_depth.sell_orders.keys())
@@ -124,7 +131,7 @@ class Trader:
                         if sell_quantity > 0:
                             orders.append(Order(product, best_bid, -sell_quantity))
 
-            result[product] = orders
+                result[product] = orders
 
         conversions = 0
         traderData = ""
