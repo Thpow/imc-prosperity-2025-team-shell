@@ -15,7 +15,7 @@ best_path = []
 
 def dfs(current_currency, current_amount, path, trades):
     """
-    Recursively explore all conversion paths with exactly 4 trades.
+    Recursively explore all conversion paths with exactly 5 trades.
     
     Args:
         current_currency (int): Current currency index (0-3)
@@ -25,15 +25,15 @@ def dfs(current_currency, current_amount, path, trades):
     """
     global max_amount, best_path
     
-    # Base case: exactly 4 trades and back to Seashells
-    if trades == 4 and current_currency == 3:
+    # Base case: exactly 5 trades and back to Seashells
+    if trades == 5 and current_currency == 3:
         if current_amount > max_amount:
             max_amount = current_amount
             best_path = path.copy()
         return
     
-    # Stop if we've exceeded 4 trades or can't reach 4 trades with remaining steps
-    if trades >= 4:
+    # Stop if we've exceeded 5 trades or can't reach 5 trades with remaining steps
+    if trades >= 5:
         return
     
     # Try converting to each currency
@@ -48,7 +48,7 @@ dfs(initial_currency, initial_amount, [initial_currency], 0)
 
 # Output the result
 if max_amount > 500:
-    print("Most profitable path with exactly 4 trades:", " -> ".join(names[c] for c in best_path))
+    print("Most profitable path with exactly 5 trades:", " -> ".join(names[c] for c in best_path))
     print(f"Final amount: {max_amount:.2f} Seashells")
 else:
-    print("No profitable path with exactly 4 trades increases the initial 500 Seashells.")
+    print("No profitable path with exactly 5 trades increases the initial 500 Seashells.")
